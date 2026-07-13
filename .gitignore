@@ -1,0 +1,31 @@
+# === Go Toolchain ===
+# Compiled binaries and packages
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Common Go build outputs
+bin/
+dist/
+
+# Project binaries (setup scripts build these at the module root; *.exe already
+# covers Windows)
+/s1temap
+/s1temap-api
+
+# Architecture specific extensions
+*.a
+
+# Go coverage tool outputs
+*.coverprofile
+coverage.txt
+
+# Dependency directories (if using 'go mod vendor')
+# Uncomment the line below if you do not want to commit your vendored dependencies
+# vendor/
+
+.idea
