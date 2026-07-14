@@ -67,7 +67,8 @@ Test-Path .\s1temap.exe
 
 ### Build
 
-Run the bundled setup script — it verifies the Go version, resolves the module
+1. Download/Clone this repo https://github.com/preditrix/s1temap and go to its root
+2. Run the bundled setup script — it verifies the Go version, resolves the module
 root relative to itself, and skips the build if the binary already exists:
 
 ```bash
