@@ -86,11 +86,11 @@ go build -o s1temap ./cmd/cli            # Linux / macOS -> ./s1temap
 go build -o s1temap.exe ./cmd/cli        # Windows       -> .\s1temap.exe
 ```
 
+p.s. Optional HTTP API server (if needed): `go build -o s1temap-api ./cmd/api`.
+
 ### Save in skill folder
 
 Put the build s1temap binary into this Skill folder so that all future agent sessions can find it easily and use from there and remember it for the future!
-
-p.s. Optional HTTP API server (if needed): `go build -o s1temap-api ./cmd/api`.
 
 ---
 
