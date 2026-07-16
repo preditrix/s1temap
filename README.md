@@ -62,26 +62,14 @@ final one and the periodic `--heartbeat-every` progress — is written to
 ## Use as AI Agent Skill
 
 s1temap ships as a self-contained [Agent Skill](./skill/SKILL.md) so AI coding
-agents can crawl sitemaps, warm caches, and check for broken pages on demand.
-The skill folder (`skill/`) bundles the full command guide plus build scripts
-(`setup.sh`, `setup.ps1`).
+agents (Claude Code, Claude.ai, the Agent SDK/API, OpenAI Codex, Cursor, Aider,
+and others) can crawl sitemaps, warm caches, and check for broken pages on
+demand. The skill folder (`skill/`) bundles the full command guide plus the build
+scripts (`setup.sh`, `setup.ps1`), which install the binary to a fixed,
+session-independent location so every agent session finds it reliably.
 
-- **Claude Code**: copy the folder into a skills directory — it is
-  auto-discovered.
-  ```bash
-  cp -r skill ~/.claude/skills/s1temap          # personal
-  # or, project-scoped:
-  mkdir -p .claude/skills && cp -r skill .claude/skills/s1temap
-  ```
-- **Claude.ai / Agent SDK / API**: upload the `skill/` folder as a skill (or
-  point the SDK `skills` option at it).
-- **OpenAI Codex**: reference `skill/SKILL.md` from your `AGENTS.md`.
-- **Cursor / Aider / others**: reference `skill/SKILL.md` from the project
-  rules/instructions file.
-
-Full instructions and the command reference are in
-[`skill/SKILL.md`](./skill/SKILL.md).
-
+Installation and per-agent setup instructions live in the skill itself — see
+**[`skill/SKILL.md`](./skill/SKILL.md)**.
 
 ## HTTP API
 
