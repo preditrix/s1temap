@@ -90,7 +90,7 @@ p.s. Optional HTTP API server (if needed): `go build -o s1temap-api ./cmd/api`.
 
 ### Save in skill folder
 
-Put the build s1temap binary into this Skill folder so that all future agent sessions can easily find it and use and remember it for the future!
+Put the built s1temap binary file into some user folder and remember that location for all future agent sessions in Agent/Skill memory, so that for all future s1temap skill requests - the Agent will know where is s1temap binary saved and can run it directly without issues.
 
 ---
 
