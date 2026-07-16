@@ -13,7 +13,7 @@ description: >-
 
 s1temap crawls a set of URLs — discovered from a web-site **sitemap** (root URL) or read from a provided
 **URL list** — and reports each URL's HTTP status, timing, and errors, plus a
-summary. 
+summary.
 
 Use this skill when the user wants to:
 - Check full sitemap of a web-site by its root sitemap URL
@@ -28,69 +28,116 @@ This skill covers the **CLI**. An optional HTTP API server also exists
 
 ---
 
+## Where the binary lives (read this first)
+
+s1temap is a compiled Go binary. It is **always installed to one fixed,
+session-independent location**, so every future agent session can find it by the
+same path without guessing:
+
+| Platform    | Fixed path                                              |
+|-------------|---------------------------------------------------------|
+| Linux/macOS | `$S1TEMAP_HOME/s1temap`  (default `~/.s1temap/bin/s1temap`) |
+| Windows     | `%S1TEMAP_HOME%\s1temap.exe` (default `%USERPROFILE%\.s1temap\bin\s1temap.exe`) |
+
+The environment variable `S1TEMAP_HOME` is the single source of truth. If it is
+set, the binary lives in that directory; otherwise the default above is used.
+
+**Do not** build into `/tmp`, into the current working directory, or into the
+repo root — those locations do not survive across sessions and are the usual
+cause of "binary not found next time".
+
+---
+
+## Setup (per session)
+
+At the start of each session, check the fixed path **first**. Only build if it is
+missing.
+
+```bash
+# Linux / macOS
+BIN="${S1TEMAP_HOME:-$HOME/.s1temap/bin}/s1temap"
+[ -x "$BIN" ] && echo "found: $BIN" || echo "not found — build it"
+```
+
+```powershell
+# Windows (PowerShell)
+$Bin = if ($env:S1TEMAP_HOME) { "$env:S1TEMAP_HOME\s1temap.exe" } else { "$env:USERPROFILE\.s1temap\bin\s1temap.exe" }
+if (Test-Path $Bin) { "found: $Bin" } else { "not found — build it" }
+```
+
+- **Found** → run it directly via `$BIN` / `$Bin`.
+- **Not found** → build it (below).
+
+### Build
+
+Building needs the Go module source, so this step requires the repository.
+
+1. Clone the repo and enter it:
+   ```bash
+   git clone https://github.com/preditrix/s1temap
+   cd s1temap
+   ```
+2. Run the bundled setup script. It verifies the Go version, finds the module
+   root by walking up to `go.mod`, builds **straight into the fixed install
+   location**, skips the build if the binary already exists, and prints the
+   absolute binary path as its **last stdout line**:
+
+   ```bash
+   # Linux / macOS
+   bash skill/setup.sh
+
+   # Windows (PowerShell)
+   .\skill\setup.ps1
+   ```
+
+3. **Remember the printed path** (the script's last line) in Agent/Skill memory,
+   so all future sessions invoke the binary directly without rebuilding.
+
+Or build manually into the fixed location from the module root (the folder with
+`go.mod`):
+
+```bash
+# Linux / macOS  -> ~/.s1temap/bin/s1temap
+mkdir -p "${S1TEMAP_HOME:-$HOME/.s1temap/bin}"
+go build -trimpath -ldflags="-s -w" -o "${S1TEMAP_HOME:-$HOME/.s1temap/bin}/s1temap" ./cmd/cli
+```
+
+```powershell
+# Windows -> %USERPROFILE%\.s1temap\bin\s1temap.exe
+$dir = if ($env:S1TEMAP_HOME) { $env:S1TEMAP_HOME } else { "$env:USERPROFILE\.s1temap\bin" }
+New-Item -ItemType Directory -Force -Path $dir | Out-Null
+go build -trimpath -ldflags="-s -w" -o "$dir\s1temap.exe" ./cmd/cli
+```
+
+p.s. Optional HTTP API server (if needed): `go build -o s1temap-api ./cmd/api`.
+
+### Optional: put it on PATH
+
+If you'd rather call `s1temap` without the full path, symlink the fixed binary
+into a directory already on `PATH` (e.g. `~/.local/bin`):
+
+```bash
+ln -sfn "${S1TEMAP_HOME:-$HOME/.s1temap/bin}/s1temap" "$HOME/.local/bin/s1temap"
+```
+
+The fixed path remains the primary, reliable mechanism; PATH is just a
+convenience.
+
+---
+
 ## Prerequisites
 
-s1temap is written in Go and must be compiled before use. **Required: Go 1.26+.**
+s1temap is written in Go. **Required: Go 1.26+.**
 
 ```bash
 go version   # expect: go version go1.26.x ...
 ```
-
-If Go is missing or older than 1.26, install it, then retry:
 
 | Platform | Install |
 |----------|---------|
 | Windows  | `winget install GoLang.Go` or https://go.dev/dl/ |
 | macOS    | `brew install go` or https://go.dev/dl/ |
 | Linux    | `sudo apt install golang-go` (Debian/Ubuntu) or https://go.dev/dl/ |
-
-The Go module lives at the repository root (the folder containing `go.mod`).
-The scripts and commands below refer to it as the **module root**.
-
----
-
-## Setup (per session)
-
-At the start of each session, check whether the binary already exists before
-building.
-
-```bash
-# Linux / macOS (from the module root)
-ls -1 s1temap 2>/dev/null && echo "binary found" || echo "not found"
-
-# Windows (PowerShell)
-Test-Path .\s1temap.exe
-```
-
-- **Found** → use it directly.
-- **Not found** → build it (below).
-
-### Build
-
-1. Download/Clone this repo https://github.com/preditrix/s1temap and go to its root
-2. Run the bundled setup script — it verifies the Go version, resolves the module
-root relative to itself, and skips the build if the binary already exists:
-
-```bash
-# Linux / macOS
-bash skill/setup.sh
-
-# Windows (PowerShell)
-.\skill\setup.ps1
-```
-
-Or build manually from the module root:
-
-```bash
-go build -trimpath -ldflags="-s -w" -o s1temap ./cmd/cli            # Linux / macOS -> ./s1temap
-go build -trimpath -ldflags="-s -w" -o s1temap.exe ./cmd/cl        # Windows       -> .\s1temap.exe
-```
-
-p.s. Optional HTTP API server (if needed): `go build -o s1temap-api ./cmd/api`.
-
-### Save in skill folder
-
-Put the built s1temap binary file into some user folder and remember that location for all future agent sessions in Agent/Skill memory, so that for all future s1temap skill requests - the Agent will know where is s1temap binary saved and can run it directly without issues.
 
 ---
 
@@ -228,16 +275,21 @@ warn/error to stderr. Set `SMAP_LOG_LEVEL=error` for quiet runs.
 
 Run this at the start of every session before issuing crawl commands:
 
-1. **Existing binary?** Look for `s1temap` (Linux/macOS) or `s1temap.exe`
-   (Windows) in the module root or on `PATH`. Found → step 3.
-2. **Go version?** Run `go version`. Go 1.26+ → build (`bash skill/setup.sh`,
-   `.\skill\setup.ps1`, or `go build -o s1temap ./cmd/cli`) and continue.
-   Otherwise stop, explain how to install Go (see Prerequisites), and wait.
-3. **Pick the command** — `start` for XML sitemaps, `list` for URL files,
+1. **Binary at the fixed path?** Check
+   `${S1TEMAP_HOME:-~/.s1temap/bin}/s1temap` (Linux/macOS) or
+   `%S1TEMAP_HOME%\s1temap.exe` / `%USERPROFILE%\.s1temap\bin\s1temap.exe`
+   (Windows). Found & executable → go to step 4.
+2. **Build it.** Clone the repo if needed, then run `bash skill/setup.sh`
+   (or `.\skill\setup.ps1`). The script builds into the fixed path and prints
+   the absolute binary path on its last line.
+3. **Remember the path** in Agent/Skill memory for future sessions. If Go is
+   missing or older than 1.26, stop and explain how to install it
+   (see Prerequisites), then wait.
+4. **Pick the command** — `start` for XML sitemaps, `list` for URL files,
    `tools convert-sitemap-to-urllist` to extract URLs without crawling.
-4. **Apply filters** — use `--filter-status` (e.g. `!200`) to surface only
+5. **Apply filters** — use `--filter-status` (e.g. `!200`) to surface only
    relevant results.
-5. **Save output** — use `--output-json` when results must be inspected or shared
+6. **Save output** — use `--output-json` when results must be inspected or shared
    later; set `SMAP_LOG_LEVEL=error` to keep stdout clean.
 
 ---
@@ -246,8 +298,9 @@ Run this at the start of every session before issuing crawl commands:
 
 This folder (`SKILL.md` + `setup.sh` + `setup.ps1`) is a self-contained
 [Agent Skill](https://docs.claude.com/en/docs/agents-and-tools/agent-skills).
-Building the binary needs the Go module source, so keep the skill inside the repo
-**or** pre-build `s1temap` and put it on `PATH` (then the skill just invokes it).
+Building the binary needs the Go module source, so keep the repo available for
+the first build. After that, the binary lives at the fixed path and the skill
+just invokes it — no source needed for subsequent sessions.
 
 ### Claude Code (CLI / IDE)
 
@@ -279,8 +332,9 @@ Codex reads `AGENTS.md`. Add a pointer so Codex loads the guide on demand:
 ```markdown
 ## s1temap (sitemap crawler)
 For sitemap crawling / cache warming / broken-link checks, follow
-`skill/SKILL.md`: build with `go build -o s1temap ./cmd/cli`, then use
-`s1temap start|list|tools ...`.
+`skill/SKILL.md`. The binary lives at the fixed path
+`${S1TEMAP_HOME:-~/.s1temap/bin}/s1temap`; if missing, build it with
+`bash skill/setup.sh`. Then use `s1temap start|list|tools ...`.
 ```
 
 (Or paste the **Commands**, **Common flags**, and **Agent checklist** sections

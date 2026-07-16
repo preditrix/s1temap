@@ -1,20 +1,65 @@
 #!/usr/bin/env bash
-# setup.sh — build the s1temap CLI binary (Linux / macOS)
+# setup.sh — build & install the s1temap CLI binary (Linux / macOS)
 #
-# Safe to run from anywhere: it resolves the Go module root (repo root) relative to
-# this script, so it works whether the skill lives in the repo or is copied into
-# an agent's skills directory.
+# The binary is ALWAYS installed to one fixed, session-independent location:
+#     $S1TEMAP_HOME/s1temap   (default: ~/.s1temap/bin/s1temap)
+#
+# This is the key to reliability: every future agent session — in Claude Code,
+# Codex, Cursor, etc. — looks in the same fixed path, regardless of the current
+# working directory or where the skill folder happens to live.
+#
+# The script is safe to run from anywhere: it walks up from its own location to
+# find the Go module root (the directory containing go.mod) only when a build is
+# actually needed.
+#
+# The LAST line printed to stdout is the absolute path to the binary, so an agent
+# can capture and remember it.
 set -e
 
 REQUIRED_MAJOR=1
 REQUIRED_MINOR=26
 BINARY=s1temap
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-MODULE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)" # repo root — the directory containing go.mod
-cd "$MODULE_DIR"
+# ── Fixed install location (override with S1TEMAP_HOME) ───────────────────────
+INSTALL_DIR="${S1TEMAP_HOME:-$HOME/.s1temap/bin}"
+INSTALL_PATH="$INSTALL_DIR/$BINARY"
 
-# ── Check Go ──────────────────────────────────────────────────────────────────
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+mkdir -p "$INSTALL_DIR"
+
+# ── 1) Already installed? Use it, print path, done. ──────────────────────────
+if [ -x "$INSTALL_PATH" ]; then
+  echo "Binary already installed — skipping build."
+  echo "To rebuild: delete '$INSTALL_PATH' and re-run this script."
+  echo ""
+  echo "Quick start:"
+  echo "  $INSTALL_PATH start https://example.com/sitemap.xml"
+  echo "  $INSTALL_PATH start https://example.com/sitemap.xml --filter-status=!200"
+  echo "  $INSTALL_PATH list ./urls.txt"
+  echo ""
+  echo "$INSTALL_PATH"
+  exit 0
+fi
+
+# ── 2) Need to build: locate the Go module root (walk up to find go.mod) ─────
+MODULE_DIR="$SCRIPT_DIR"
+while [ "$MODULE_DIR" != "/" ] && [ ! -f "$MODULE_DIR/go.mod" ]; do
+  MODULE_DIR="$(dirname "$MODULE_DIR")"
+done
+
+if [ ! -f "$MODULE_DIR/go.mod" ]; then
+  echo "Error: could not find go.mod above '$SCRIPT_DIR'."
+  echo ""
+  echo "The binary is not installed yet and the Go source is required to build it."
+  echo "Clone the repository and run this script from inside it:"
+  echo "  git clone https://github.com/preditrix/s1temap"
+  echo "  cd s1temap"
+  echo "  bash skill/setup.sh"
+  exit 1
+fi
+
+# ── 3) Check Go ───────────────────────────────────────────────────────────────
 if ! command -v go &>/dev/null; then
   echo "Error: Go is not installed or not in PATH."
   echo ""
@@ -45,22 +90,20 @@ fi
 
 echo "Go $(go version | awk '{print $3}') — OK"
 
-# ── Build (skip if binary already exists) ────────────────────────────────────
-if [ -x "./${BINARY}" ]; then
-  echo "Binary ${MODULE_DIR}/${BINARY} already exists — skipping build."
-  echo "Delete it or run 'go build -o ${BINARY} ./cmd/cli' to rebuild."
-else
-  echo "Building ${BINARY}..."
-  go build -o "${BINARY}" ./cmd/cli
-  echo ""
-  echo "Build complete: ${MODULE_DIR}/${BINARY}"
-fi
+# ── 4) Build straight into the fixed install location ────────────────────────
+echo "Building ${BINARY} -> ${INSTALL_PATH} ..."
+( cd "$MODULE_DIR" && go build -trimpath -ldflags="-s -w" -o "$INSTALL_PATH" ./cmd/cli )
+echo "Installed: $INSTALL_PATH"
+echo ""
 
-echo ""
 echo "Quick start:"
-echo "  ${MODULE_DIR}/${BINARY} start https://example.com/sitemap.xml"
-echo "  ${MODULE_DIR}/${BINARY} start https://example.com/sitemap.xml --filter-status=!200"
-echo "  ${MODULE_DIR}/${BINARY} list ./urls.txt"
+echo "  $INSTALL_PATH start https://example.com/sitemap.xml"
+echo "  $INSTALL_PATH start https://example.com/sitemap.xml --filter-status=!200"
+echo "  $INSTALL_PATH list ./urls.txt"
 echo ""
-echo "Optional HTTP API server: go build -o s1temap-api ./cmd/api"
+echo "Optional HTTP API server: (cd \"$MODULE_DIR\" && go build -o \"$INSTALL_DIR/s1temap-api\" ./cmd/api)"
 echo "See SKILL.md for the full command reference and examples."
+echo ""
+
+# LAST line = absolute binary path (agents capture this)
+echo "$INSTALL_PATH"
