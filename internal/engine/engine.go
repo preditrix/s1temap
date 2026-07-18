@@ -36,10 +36,7 @@ type Config struct {
 // job channel and workers drain it; cancelling ctx stops the run promptly. Run
 // does not close sink — the caller owns its lifecycle.
 func Run(ctx context.Context, urls []string, cfg Config, sink Sink) (Summary, error) {
-	workers := cfg.Workers
-	if workers < 1 {
-		workers = 1
-	}
+	workers := max(cfg.Workers, 1)
 	// Default to HEAD (with GET fallback) when unset; honor an explicit GET.
 	method := cfg.Method
 	if method == "" {

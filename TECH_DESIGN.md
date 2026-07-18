@@ -25,26 +25,26 @@ ships two front-ends over one engine:
 - A **minimal** set of clean abstractions — no speculative extensibility.
 - Correctness: no data races, no leaked HTTP bodies / file descriptors, no
   process-killing `log.Fatal` inside library code.
-- Preserve the full legacy feature set (commands, flags, output formats, API
-  surface).
+- Preserve the documented command surface, flags, output formats, and API
+  surface.
 
 **Non-goals**
 - A plugin framework or a large interface hierarchy.
 - Persisting jobs (the API job store is in-memory by design).
 
-## 3. Problems this design fixes (vs. the legacy engine)
+## 3. What this design achieves
 
-| Legacy problem | Fix |
+| Capability | How it is achieved |
 |---|---|
-| Data race on lazy `statusFilter` init | `statusfilter.Filter` compiled once, immutable, concurrency-safe |
-| Unclosed `resp.Body` / files (leaks) | every body drained + closed; every file closed |
-| `log.Fatal` inside worker goroutines | functions return errors; only the top layer decides to exit |
-| Hand-rolled JSON + O(n²) file rewrite | `encoding/json`; `JSONArrayFile` writes once on `Close` (O(n)) |
-| Fragile worker pool (WaitGroup counts requests) | idiomatic pool: producer closes channel, workers range, one `WaitGroup` |
-| Per-worker idle throttle; API never clamps | global throttling `RoundTripper` in the HTTP client (CLI + API) |
-| Unbounded recursion on cyclic sitemap index | `source` walker uses a visited set + `MaxDepth/MaxSitemaps/MaxURLs` |
-| Duplicated modifiers / filters / parsers / strip helpers | one canonical implementation of each |
-| Two result paths (`OnResult` + internal logging) | a single `engine.Sink` path |
+| Shared crawl engine | CLI and API both run through `internal/engine.Run` |
+| Small, explicit abstractions | `engine.Sink`, `httpx.RequestOption`, `statusfilter.Filter`, and `source.Limits` cover the core extension points |
+| Correct resource handling | HTTP bodies are drained and closed; file handles are closed by the owning sink or caller |
+| Concurrency safety | worker state, summaries, sinks, jobs, and status filters are guarded or immutable |
+| Deterministic output contracts | NDJSON, TSV, and JSON array sinks use stable wire shapes and isolated formatting logic |
+| Global request throttling | the HTTP client enforces a minimum interval across all goroutines |
+| Sitemap traversal bounds | cycle detection plus `MaxDepth`, `MaxSitemaps`, and `MaxURLs` keep discovery bounded |
+| Unified request customization | user-agent, auth, cookies, headers, and prefix URL are applied through the same request-option pipeline |
+| Single result flow | every checked URL produces one `engine.Result`, and sinks decide how to store or display it |
 
 ## 4. Layering & dependency rule
 
